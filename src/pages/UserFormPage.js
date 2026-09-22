@@ -45,36 +45,84 @@ class UserFormPage {
   }
 
   async selectEmployee(searchTerm) {
-    // Type character-by-character (not `fill`) so the app's real keyup-driven
-    // debounce/suggestion logic fires exactly as it does for a real user.
-    const suggestionsResponsePromise = this.page.waitForResponse(
-      (response) => response.url().includes('/api/v2/pim/employees') && response.request().method() === 'GET'
-    );
-    await this.employeeNameInput.pressSequentially(searchTerm, { delay: 50 });
+    const suggestionsList = this.page.getByRole('listbox');
+    const invalidIndicator = this.page.getByText('Invalid', { exact: true });
 
-    // Wait for the actual suggestions API call to resolve before reading the
+    // Type character-by-character (not `fill`) so the app's real keyup-driven
+    // debounce/suggestion logic fires exactly as it does for a real user, and
+    // wait for the actual suggestions API call to resolve before reading the
     // list. Without this, the list can still be showing a transient/stale
     // render (e.g. a "Loading..." placeholder or the pre-debounce state) when
     // we click, and OrangeHRM's autocomplete replaces the option nodes once
     // the real response lands — clicking a node from that stale render is a
     // no-op that leaves the field marked "Invalid".
-    await suggestionsResponsePromise;
+    const openSuggestions = async (term) => {
+      await this.employeeNameInput.fill('');
+      const suggestionsResponsePromise = this.page.waitForResponse(
+        (response) => response.url().includes('/api/v2/pim/employees') && response.request().method() === 'GET'
+      );
+      await this.employeeNameInput.pressSequentially(term, { delay: 50 });
+      await suggestionsResponsePromise;
+      await suggestionsList.waitFor({ state: 'visible', timeout: 10000 });
+    };
 
-    const suggestionsList = this.page.getByRole('listbox');
-    await suggestionsList.waitFor({ state: 'visible', timeout: 10000 });
+    // Try every REAL matching suggestion (excluding transient
+    // "Loading..."/"No Records Found" placeholders) for one search term. On
+    // this shared public demo instance, OrangeHRM permanently marks the
+    // field "Invalid" when the chosen employee already has a System User
+    // account — that's a real rejection, not a transient re-validation
+    // flicker. Returns true once a selection is accepted.
+    const tryTerm = async (term) => {
+      await openSuggestions(term);
 
-    // Wait for a REAL matching suggestion (containing the typed term) rather
-    // than the first "option" in the list, which may transiently be a
-    // "Loading..." placeholder or a "No Records Found" message.
-    const matchingOption = suggestionsList
-      .getByRole('option', { name: new RegExp(searchTerm, 'i') })
-      .first();
-    await matchingOption.waitFor({ state: 'visible', timeout: 10000 });
-    await matchingOption.click();
+      const candidateNames = (
+        await suggestionsList.getByRole('option', { name: new RegExp(term, 'i') }).allTextContents()
+      ).filter((name) => !/^(searching|no records found)/i.test(name));
 
-    // The app briefly marks the field "Invalid" until it re-validates the
-    // selection; wait for that transient state to clear before moving on.
-    await expect(this.page.getByText('Invalid', { exact: true })).toHaveCount(0, { timeout: 5000 });
+      for (let i = 0; i < candidateNames.length; i++) {
+        if (i > 0) await openSuggestions(term);
+
+        const option = suggestionsList.getByRole('option', { name: candidateNames[i], exact: true });
+        const isVisible = await option
+          .waitFor({ state: 'visible', timeout: 10000 })
+          .then(() => true)
+          .catch(() => false);
+        if (!isVisible) continue; // suggestion no longer present on this shared instance; try the next one
+
+        await option.click();
+
+        // Give the app a moment to mark the field "Invalid" if this employee
+        // already has a System User account; if it doesn't appear, the
+        // selection was accepted.
+        const rejected = await invalidIndicator
+          .waitFor({ state: 'visible', timeout: 1000 })
+          .then(() => true)
+          .catch(() => false);
+        if (!rejected) return true;
+      }
+      return false;
+    };
+
+    // The suggestions endpoint only returns a small, fixed-size slice of
+    // matches per query rather than every match, so a single broad search
+    // term always surfaces the same handful of employees. After enough
+    // automation runs against this shared public demo, that entire slice can
+    // already be linked to System User accounts. If so, fall back through
+    // other letters to reach a different slice of the employee list instead
+    // of failing outright.
+    const fallbackLetters = 'eiomnrltsdcgpbhuvwfyjkqxz'
+      .split('')
+      .filter((letter) => letter !== searchTerm.toLowerCase());
+    const termsToTry = [searchTerm, ...fallbackLetters];
+
+    for (const term of termsToTry) {
+      if (await tryTerm(term)) return;
+    }
+
+    throw new Error(
+      `selectEmployee: no employee suggestion across search terms [${termsToTry.join(', ')}] was accepted ` +
+        '(likely all already linked to a System User)'
+    );
   }
 
   async selectStatus(status) {

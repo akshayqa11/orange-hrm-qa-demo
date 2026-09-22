@@ -24,7 +24,7 @@ tools:
   - mcp__playwright-test__generator_read_log
   - mcp__playwright-test__generator_setup_page
   - mcp__playwright-test__generator_write_test
-model: Claude Sonnet 4.6
+model: claude-sonnet-5
 mcp-servers:
   playwright-test:
     type: stdio

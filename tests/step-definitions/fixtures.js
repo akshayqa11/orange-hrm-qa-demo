@@ -1,4 +1,16 @@
+const fs = require('fs');
+const path = require('path');
 const { test: base, createBdd } = require('playwright-bdd');
+const { baseURL, username, password } = require('../../config/env');
+
+// Projects whose scenarios run concurrently, in separate workers, against
+// the SAME live OrangeHRM demo (see playwright.config.js). Loading one
+// shared storageState file for all of them gives every worker the identical
+// session cookie, so one worker's request can invalidate another's
+// in-flight CSRF/session token and cause silent form-submission failures.
+// The `storageState` override below gives each WORKER its own,
+// independently-authenticated session instead.
+const PARALLEL_SESSION_PROJECTS = new Set(['user-crud-parallel-create', 'user-crud-delete-dependent']);
 
 /**
  * The "User Management End-to-End Workflow" feature is a single continuous,
@@ -18,6 +30,37 @@ const { test: base, createBdd } = require('playwright-bdd');
  * (non-BDD) tests in this repo.
  */
 const test = base.extend({
+  // Not worker-scoped: the built-in `storageState` fixture is test-scoped,
+  // and Playwright doesn't allow narrowing a fixture's scope on override.
+  // The on-disk cache (fs.existsSync below) still means only the first test
+  // to run in a given worker actually performs a login - every later test in
+  // that same worker reuses the file it wrote.
+  storageState: async ({ browser }, use, testInfo) => {
+    const configuredPath = testInfo.project.use.storageState;
+
+    if (!PARALLEL_SESSION_PROJECTS.has(testInfo.project.name) || !configuredPath) {
+      await use(configuredPath);
+      return;
+    }
+
+    const ext = path.extname(configuredPath);
+    const perWorkerPath = configuredPath.slice(0, -ext.length) + `-worker${testInfo.parallelIndex}` + ext;
+
+    if (!fs.existsSync(perWorkerPath)) {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      await page.goto(`${baseURL}/web/index.php/auth/login`);
+      await page.getByRole('textbox', { name: 'Username' }).fill(username);
+      await page.getByRole('textbox', { name: 'Password' }).fill(password);
+      await page.getByRole('button', { name: 'Login' }).click();
+      await page.waitForURL('**/dashboard/index');
+      await context.storageState({ path: perWorkerPath });
+      await context.close();
+    }
+
+    await use(perWorkerPath);
+  },
+
   sharedPage: [
     async ({ browser }, use) => {
       const context = await browser.newContext();

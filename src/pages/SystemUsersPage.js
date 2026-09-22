@@ -35,6 +35,15 @@ class SystemUsersPage {
   }
 
   async searchByUsername(username) {
+    // Callers often invoke this right after a Save redirects here (e.g. Add
+    // User -> System Users list); wait for the list itself to be ready
+    // first, otherwise fill/click can land mid-navigation on the page we're
+    // leaving, the interaction never reaches the real search button, and the
+    // response promise below then waits forever for a request that was
+    // never sent.
+    await expect(this.page).toHaveURL(/\/admin\/viewSystemUsers/);
+    await expect(this.searchButton).toBeVisible();
+
     const responsePromise = this.page.waitForResponse(
       (response) => response.url().includes('/api/v2/admin/users') && response.request().method() === 'GET'
     );
@@ -73,7 +82,15 @@ class SystemUsersPage {
   }
 
   async clickEditForUsername(username) {
+    // Filter by username first rather than scanning whatever page of the
+    // table happens to be rendered: this is a live, shared demo instance
+    // with many accumulated users, so a freshly-created user can easily
+    // land outside the default (unfiltered, first-page) result set and the
+    // row would otherwise never appear.
+    await this.searchByUsername(username);
+
     const row = this.getRowByUsername(username);
+    await expect(row).toBeVisible();
     // The Actions column renders Delete (trash icon) BEFORE Edit (pencil
     // icon) — target the pencil explicitly to avoid ever hitting Delete.
     const editButton = row.locator('button:has(i.bi-pencil-fill)');

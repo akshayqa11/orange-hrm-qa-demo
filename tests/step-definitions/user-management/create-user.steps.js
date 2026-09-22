@@ -79,6 +79,11 @@ Then('a success message should be displayed', async ({ sharedPage }) => {
 Then('the new user should appear in the System Users list', async ({ sharedPage, userContext }) => {
   const systemUsersPage = new SystemUsersPage(sharedPage);
   await expect(sharedPage).toHaveURL(/\/admin\/viewSystemUsers/);
+  // Filter by username rather than scanning the unfiltered (default-sorted,
+  // first-page) table: on this live, shared demo instance with many
+  // accumulated users, a freshly-created user can easily fall outside that
+  // default result set.
+  await systemUsersPage.searchByUsername(userContext.createdUser.username);
   await expect(systemUsersPage.getRowByUsername(userContext.createdUser.username)).toBeVisible();
 });
 

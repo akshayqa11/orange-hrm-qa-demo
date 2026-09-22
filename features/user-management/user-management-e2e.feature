@@ -4,10 +4,6 @@ Feature: User Management End-to-End Workflow
   I want to log in, create, search, edit, and log out through OrangeHRM User Management
   So that the complete user administration journey works correctly end to end
 
-  # This Feature is ONE continuous, ordered business flow. Scenarios are stateful:
-  # they share the same authenticated browser session and pass data (created
-  # user id/username) forward via the shared `userContext` fixture. Do not
-  # reorder scenarios or run them in isolation.
 
   # Tag classification:
   #   @smoke      Minimal, fast, critical happy path (login -> navigate -> create

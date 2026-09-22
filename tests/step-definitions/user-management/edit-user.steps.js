@@ -53,6 +53,11 @@ Then('the update user API response should be successful', async ({ apiState, use
 Then('the updated details should appear in the System Users list', async ({ sharedPage, userContext }) => {
   const systemUsersPage = new SystemUsersPage(sharedPage);
   await expect(sharedPage).toHaveURL(/\/admin\/viewSystemUsers/);
+  // Filter by username rather than scanning the unfiltered (default-sorted,
+  // first-page) table: on this live, shared demo instance with many
+  // accumulated users, the updated user can easily fall outside that
+  // default result set.
+  await systemUsersPage.searchByUsername(userContext.createdUser.username);
   const row = systemUsersPage.getRowByUsername(userContext.createdUser.username);
   await expect(row).toBeVisible();
   await expect(row).toContainText(userContext.createdUser.status);

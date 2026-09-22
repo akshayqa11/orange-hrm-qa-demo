@@ -1,0 +1,40 @@
+{
+  "name": "orange-hrm-qa-demo",
+  "version": "1.0.0",
+  "description": "Playwright with JavaScript automation framework built using the Page Object Model (POM). Covers OrangeHRM test scenarios with a clean, scalable, and maintainable structure.",
+  "main": "index.js",
+  "dependencies": {
+    "dotenv": "^18.0.1",
+    "playwright": "^1.63.0",
+    "playwright-bdd": "^9.2.1",
+    "playwright-core": "^1.63.0",
+    "undici-types": "^8.9.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.2"
+  },
+  "scripts": {
+    "bddgen": "bddgen",
+    "test": "bddgen && playwright test",
+    "test:smoke": "bddgen --tags \"@smoke\" && playwright test",
+    "test:regression": "bddgen --tags \"@regression\" && playwright test",
+    "test:sit": "bddgen --tags \"@sit\" && playwright test",
+    "test:staging": "ENV=staging npm run test",
+    "test:qa": "ENV=qa npm run test -- --headed",
+    "test:prod": "ENV=prod npm run test",
+    "report": "playwright show-report"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/akshayqa11/orange-hrm-qa-demo.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/akshayqa11/orange-hrm-qa-demo/issues"
+  },
+  "homepage": "https://github.com/akshayqa11/orange-hrm-qa-demo#readme"
+}

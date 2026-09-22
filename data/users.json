@@ -1,0 +1,14 @@
+{
+  "validUser": {
+    "username": "from_env",
+    "password": "from_env"
+  },
+  "newSystemUser": {
+    "userRole": "Admin",
+    "status": "Enabled",
+    "employeeSearchTerm": "a"
+  },
+  "updatedSystemUser": {
+    "status": "Disabled"
+  }
+}
